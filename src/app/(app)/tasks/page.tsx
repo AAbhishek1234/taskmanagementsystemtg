@@ -373,21 +373,34 @@ function NewTaskForm({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const isComplete =
+    !!title.trim() &&
+    !!description.trim() &&
+    !!clientId &&
+    !!stageId &&
+    !!ownerId &&
+    !!dueDate &&
+    assigneeIds.length > 0;
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+
+    if (!isComplete) {
+      setError("Please fill in all fields.");
+      return;
+    }
+
     setSubmitting(true);
     try {
-      // The client is linked directly (clientId). No calendar content item
-      // is attached, so no calendar text leaks onto the task.
       await apiPost("/deliverables", {
-        title,
-        description: description || undefined,
-        clientId: clientId || undefined,
+        title: title.trim(),
+        description: description.trim(),
+        clientId,
         stageId,
         ownerId,
         priority,
-        dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
+        dueDate: new Date(dueDate).toISOString(),
         assigneeIds,
       });
       onCreated();
@@ -427,9 +440,12 @@ function NewTaskForm({
           <select
             value={clientId}
             onChange={(e) => setClientId(e.target.value)}
+            required
             className="input mt-1 w-full"
           >
-            <option value="">No client (internal task)</option>
+            <option value="" disabled>
+              Select a client
+            </option>
             {clients.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -444,6 +460,7 @@ function NewTaskForm({
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
+            required
             className="input mt-1 w-full resize-none"
           />
         </div>
@@ -476,6 +493,7 @@ function NewTaskForm({
           <select
             value={priority}
             onChange={(e) => setPriority(e.target.value as (typeof PRIORITIES)[number])}
+            required
             className="input mt-1 w-full capitalize"
           >
             {PRIORITIES.map((p) => (
@@ -488,13 +506,20 @@ function NewTaskForm({
 
         <div className="sm:col-span-3">
           <label className="label text-xs font-semibold uppercase tracking-wide text-navy-500">Due date</label>
-          <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="input mt-1 w-full" />
+          <input
+            type="date"
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
+            required
+            className="input mt-1 w-full"
+          />
         </div>
 
         <div className="sm:col-span-6">
           <label className="label text-xs font-semibold uppercase tracking-wide text-navy-500">Assignees</label>
           <select
             multiple
+            required
             value={assigneeIds}
             onChange={(e) => setAssigneeIds(Array.from(e.target.selectedOptions).map((o) => o.value))}
             className="input mt-1 w-full"
@@ -511,18 +536,13 @@ function NewTaskForm({
 
         <button
           type="submit"
-          disabled={submitting || !stageId || !ownerId}
+          disabled={submitting || !isComplete}
           className="btn-accent flex items-center justify-center gap-1.5 sm:col-span-6"
         >
           <Plus size={16} />
           {submitting ? "Creating..." : "Create task"}
         </button>
 
-        {!clientId && (
-          <p className="text-xs text-navy-400 sm:col-span-6">
-            No client selected — this will be an internal task, hidden from client contacts.
-          </p>
-        )}
         {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 sm:col-span-6">{error}</p>}
       </form>
     </div>
@@ -550,17 +570,25 @@ function EditTaskForm({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const isComplete = !!title.trim() && !!description.trim() && !!clientId && !!dueDate;
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+
+    if (!isComplete) {
+      setError("Please fill in all fields.");
+      return;
+    }
+
     setSubmitting(true);
     try {
       await apiPatch(`/deliverables/${deliverable.id}`, {
-        title,
-        description: description || undefined,
-        clientId: clientId || null,
+        title: title.trim(),
+        description: description.trim(),
+        clientId,
         priority,
-        dueDate: dueDate ? new Date(dueDate).toISOString() : null,
+        dueDate: new Date(dueDate).toISOString(),
       });
       onSaved();
     } catch (err) {
@@ -605,9 +633,12 @@ function EditTaskForm({
             <select
               value={clientId}
               onChange={(e) => setClientId(e.target.value)}
+              required
               className="input mt-1 w-full"
             >
-              <option value="">No client (internal task)</option>
+              <option value="" disabled>
+                Select a client
+              </option>
               {clients.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -622,6 +653,7 @@ function EditTaskForm({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
+              required
               className="input mt-1 w-full resize-none"
             />
           </div>
@@ -632,6 +664,7 @@ function EditTaskForm({
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value as (typeof PRIORITIES)[number])}
+                required
                 className="input mt-1 w-full capitalize"
               >
                 {PRIORITIES.map((p) => (
@@ -647,12 +680,17 @@ function EditTaskForm({
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
+                required
                 className="input mt-1 w-full"
               />
             </div>
           </div>
 
-          <button type="submit" disabled={submitting} className="btn-accent flex items-center justify-center gap-1.5">
+          <button
+            type="submit"
+            disabled={submitting || !isComplete}
+            className="btn-accent flex items-center justify-center gap-1.5"
+          >
             {submitting ? "Saving..." : "Save changes"}
           </button>
 
