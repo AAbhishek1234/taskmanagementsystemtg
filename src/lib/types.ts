@@ -41,8 +41,9 @@ export interface Deliverable {
   assignees: DeliverableAssignee[];
   contentItem?: { id: string; title: string; clientId: string } | null;
   checklistItems?: { id: string; label: string; done: boolean }[];
+  clientId?: string | null;
+  client?: { id: string; name: string } | null;
 }
-
 export interface Comment {
   id: string;
   body: string;
