@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Users, Mail, Copy, Check, ChevronDown, UserCog } from "lucide-react";
+import { Users, Mail, Copy, Check, ChevronDown, UserCog, Trash2 } from "lucide-react";
 import { apiGet, apiPost, ApiError } from "@/lib/api";
 import type { Client, WorkspaceUser } from "@/lib/types";
-import { ROLE_LABELS, type Role } from "@/context/AuthContext";
+import { ROLE_LABELS, useAuth, type Role } from "@/context/AuthContext";
 
 const INVITABLE_ROLES: Role[] = ["manager", "team_member", "freelancer", "client"];
 
@@ -26,10 +26,13 @@ function initialsOf(name: string) {
 }
 
 export default function UsersPage() {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<WorkspaceUser[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [tempCredential, setTempCredential] = useState<{ email: string; password: string } | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
 
   async function load() {
     setLoading(true);
@@ -48,6 +51,38 @@ export default function UsersPage() {
   useEffect(() => {
     load();
   }, []);
+
+  // Admins can't be removed here, and nobody can remove themselves.
+  function canRemove(u: WorkspaceUser) {
+    return u.role !== "admin" && u.id !== currentUser?.id;
+  }
+
+  async function handleRemove(u: WorkspaceUser) {
+    if (
+      !confirm(
+        `Remove ${u.name}?\n\nTheir tasks will be reassigned to you. If they have comments or uploaded files, they will be suspended instead of deleted so that history is kept.`,
+      )
+    ) {
+      return;
+    }
+    setNotice(null);
+    setRemovingId(u.id);
+    try {
+      const res = await apiPost<{ result: "deleted" | "suspended" }>(`/users/${u.id}/remove`, {});
+      setNotice({
+        kind: "ok",
+        text:
+          res.result === "deleted"
+            ? `${u.name} was removed.`
+            : `${u.name} has comments or files on record, so they were suspended instead of deleted.`,
+      });
+      await load();
+    } catch (err) {
+      setNotice({ kind: "error", text: err instanceof ApiError ? err.message : "Could not remove this person." });
+    } finally {
+      setRemovingId(null);
+    }
+  }
 
   return (
     <div className="relative w-full max-w-full space-y-5 overflow-x-clip sm:space-y-6">
@@ -78,9 +113,19 @@ export default function UsersPage() {
         </div>
       </div>
 
-      <DirectAddForm clients={clients} onCreated={(cred) => setTempCredential(cred)} />
+      <DirectAddForm clients={clients} onCreated={(cred) => { setTempCredential(cred); load(); }} />
 
       {tempCredential && <TempCredentialBanner credential={tempCredential} onDismiss={() => setTempCredential(null)} />}
+
+      {notice && (
+        <p
+          className={`rounded-lg px-3 py-2 text-sm ${
+            notice.kind === "ok" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
+          }`}
+        >
+          {notice.text}
+        </p>
+      )}
 
       {loading ? (
         <div className="space-y-2">
@@ -99,6 +144,7 @@ export default function UsersPage() {
                   <th className="px-4 py-3">Email</th>
                   <th className="px-4 py-3">Role</th>
                   <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -132,11 +178,23 @@ export default function UsersPage() {
                         {u.status}
                       </span>
                     </td>
+                    <td className="px-4 py-3 text-right">
+                      {canRemove(u) && (
+                        <button
+                          onClick={() => handleRemove(u)}
+                          disabled={removingId === u.id}
+                          title={`Remove ${u.name}`}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-navy-300 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
                 {users.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-4 py-10 text-center text-navy-300">
+                    <td colSpan={5} className="px-4 py-10 text-center text-navy-300">
                       No team members yet.
                     </td>
                   </tr>
@@ -178,6 +236,16 @@ export default function UsersPage() {
                       </span>
                     </div>
                   </div>
+                  {canRemove(u) && (
+                    <button
+                      onClick={() => handleRemove(u)}
+                      disabled={removingId === u.id}
+                      title={`Remove ${u.name}`}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-navy-300 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
                 </div>
               ))
             )}
