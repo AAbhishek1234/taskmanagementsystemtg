@@ -9,12 +9,15 @@ import {
   Plus,
   X,
   Filter,
+  Pencil,
+  Trash2,
 } from "lucide-react";
-import { apiGet, apiPost, ApiError } from "@/lib/api";
+import { apiGet, apiPost, apiPatch, apiDelete, ApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import type { Client, ContentItem } from "@/lib/types";
 
 const CHANNELS = ["instagram", "facebook", "linkedin", "x", "youtube", "blog", "email", "ads", "other"];
+const STATUSES = ["planned", "in_production", "ready", "scheduled", "published"];
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const WEEKDAYS_SHORT = ["S", "M", "T", "W", "T", "F", "S"];
 
@@ -30,6 +33,9 @@ function addDays(d: Date, n: number) {
 function addMonths(d: Date, n: number) {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + n, 1));
 }
+function statusLabel(s: string) {
+  return s.replace(/_/g, " ");
+}
 
 export default function CalendarPage() {
   const { user } = useAuth();
@@ -40,8 +46,12 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [editingItem, setEditingItem] = useState<ContentItem | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const canCreate = user?.role === "admin" || user?.role === "manager" || user?.role === "team_member";
+  // Matches the backend: admins, managers and team members can edit/delete.
+  const canEdit = canCreate;
 
   const gridStart = useMemo(() => addDays(month, -month.getUTCDay()), [month]);
   const gridDays = useMemo(() => Array.from({ length: 42 }, (_, i) => addDays(gridStart, i)), [gridStart]);
@@ -80,6 +90,30 @@ export default function CalendarPage() {
     }
     return map;
   }, [items]);
+
+  // Close the day panel automatically once its last item is deleted or moved away.
+  useEffect(() => {
+    if (selectedDay && !loading && (itemsByDay.get(selectedDay)?.length ?? 0) === 0) {
+      setSelectedDay(null);
+    }
+  }, [itemsByDay, selectedDay, loading]);
+
+  async function deleteItem(item: ContentItem) {
+    const taskCount = item.deliverables?.length ?? 0;
+    const extra =
+      taskCount > 0
+        ? `\n\n${taskCount} linked task${taskCount > 1 ? "s" : ""} will stay on the Tasks page but won't be tied to the calendar.`
+        : "";
+    if (!confirm(`Delete "${item.title}"?${extra}`)) return;
+
+    setActionError(null);
+    try {
+      await apiDelete(`/content-items/${item.id}`);
+      await load();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Could not delete this content item.");
+    }
+  }
 
   const monthLabel = month.toLocaleDateString(undefined, { month: "long", year: "numeric", timeZone: "UTC" });
 
@@ -157,7 +191,19 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {showForm && canCreate && <NewContentItemForm clients={clients} onCreated={() => { setShowForm(false); load(); }} />}
+      {showForm && canCreate && (
+        <NewContentItemForm
+          clients={clients}
+          onCreated={() => {
+            setShowForm(false);
+            load();
+          }}
+        />
+      )}
+
+      {actionError && (
+        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{actionError}</p>
+      )}
 
       {/* Calendar grid */}
       <div className="overflow-hidden rounded-2xl bg-white shadow-[0_2px_10px_rgba(15,23,42,0.06)]">
@@ -179,7 +225,7 @@ export default function CalendarPage() {
               <button
                 key={key}
                 onClick={() => setSelectedDay(dayItems.length > 0 ? key : null)}
-                              className={`min-h-[62px] min-w-0 border-b border-r border-navy-50 p-1 text-left align-top last:border-r-0 sm:min-h-[110px] sm:p-2 ${
+                className={`min-h-[62px] min-w-0 border-b border-r border-navy-50 p-1 text-left align-top last:border-r-0 sm:min-h-[110px] sm:p-2 ${
                   inMonth ? "bg-white" : "bg-navy-50/30"
                 } hover:bg-[#eef1fb]/70`}
               >
@@ -227,13 +273,45 @@ export default function CalendarPage() {
       {loading && <p className="text-sm text-navy-300">Loading...</p>}
 
       {selectedDay && (
-        <DayPanel dateKey={selectedDay} items={itemsByDay.get(selectedDay) ?? []} onClose={() => setSelectedDay(null)} />
+        <DayPanel
+          dateKey={selectedDay}
+          items={itemsByDay.get(selectedDay) ?? []}
+          canEdit={canEdit}
+          onEdit={(item) => setEditingItem(item)}
+          onDelete={deleteItem}
+          onClose={() => setSelectedDay(null)}
+        />
+      )}
+
+      {editingItem && (
+        <EditContentItemForm
+          item={editingItem}
+          onSaved={() => {
+            setEditingItem(null);
+            load();
+          }}
+          onClose={() => setEditingItem(null)}
+        />
       )}
     </div>
   );
 }
 
-function DayPanel({ dateKey, items, onClose }: { dateKey: string; items: ContentItem[]; onClose: () => void }) {
+function DayPanel({
+  dateKey,
+  items,
+  canEdit,
+  onEdit,
+  onDelete,
+  onClose,
+}: {
+  dateKey: string;
+  items: ContentItem[];
+  canEdit: boolean;
+  onEdit: (item: ContentItem) => void;
+  onDelete: (item: ContentItem) => void;
+  onClose: () => void;
+}) {
   const label = new Date(dateKey).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-navy-950/40 p-0 sm:items-center sm:p-4" onClick={onClose}>
@@ -263,7 +341,9 @@ function DayPanel({ dateKey, items, onClose }: { dateKey: string; items: Content
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-navy-400">
                 <span className="rounded-full bg-navy-50 px-2 py-0.5 font-medium text-navy-600">{item.channel}</span>
                 <span>{item.format}</span>
-                <span className="rounded-full bg-navy-50 px-2 py-0.5 font-medium text-navy-600">{item.status}</span>
+                <span className="rounded-full bg-navy-50 px-2 py-0.5 font-medium capitalize text-navy-600">
+                  {statusLabel(item.status)}
+                </span>
               </div>
               {item.deliverables && item.deliverables.length > 0 && (
                 <ul className="mt-2 space-y-1">
@@ -276,9 +356,153 @@ function DayPanel({ dateKey, items, onClose }: { dateKey: string; items: Content
                   ))}
                 </ul>
               )}
+
+              {canEdit && (
+                <div className="mt-2.5 flex items-center gap-1 border-t border-navy-50 pt-2">
+                  <button
+                    onClick={() => onEdit(item)}
+                    title="Edit content item"
+                    className="flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium text-navy-500 transition-colors hover:bg-blue-50 hover:text-blue-600"
+                  >
+                    <Pencil size={13} /> Edit
+                  </button>
+                  <button
+                    onClick={() => onDelete(item)}
+                    title="Delete content item"
+                    className="flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium text-navy-500 transition-colors hover:bg-red-50 hover:text-red-600"
+                  >
+                    <Trash2 size={13} /> Delete
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function EditContentItemForm({
+  item,
+  onSaved,
+  onClose,
+}: {
+  item: ContentItem;
+  onSaved: () => void;
+  onClose: () => void;
+}) {
+  const [title, setTitle] = useState(item.title);
+  const [channel, setChannel] = useState(item.channel as string);
+  const [format, setFormat] = useState(item.format);
+  const [publishDate, setPublishDate] = useState(toDateKey(new Date(item.publishDate)));
+  const [status, setStatus] = useState(item.status as string);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+
+    if (!title.trim() || !format.trim() || !publishDate) {
+      setError("Please fill in all fields.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await apiPatch(`/content-items/${item.id}`, {
+        title: title.trim(),
+        channel,
+        format: format.trim(),
+        publishDate: new Date(publishDate).toISOString(),
+        status,
+      });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not save changes.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-950/40 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-md rounded-2xl bg-white p-4 shadow-[0_25px_60px_-15px_rgba(15,23,42,0.35)] sm:p-5"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-navy-900">Edit content item</h2>
+            {item.client?.name && <p className="truncate text-xs text-navy-400">{item.client.name}</p>}
+          </div>
+          <button
+            onClick={onClose}
+            className="flex h-7 w-7 items-center justify-center rounded-full text-navy-400 hover:bg-navy-50 hover:text-navy-700"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="grid gap-3">
+          <div>
+            <label className="label text-xs font-semibold uppercase tracking-wide text-navy-500">Title</label>
+            <input value={title} onChange={(e) => setTitle(e.target.value)} required className="input mt-1 w-full" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label text-xs font-semibold uppercase tracking-wide text-navy-500">Channel</label>
+              <select value={channel} onChange={(e) => setChannel(e.target.value)} required className="input mt-1 w-full capitalize">
+                {CHANNELS.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label text-xs font-semibold uppercase tracking-wide text-navy-500">Format</label>
+              <input
+                value={format}
+                onChange={(e) => setFormat(e.target.value)}
+                placeholder="e.g. Carousel"
+                required
+                className="input mt-1 w-full"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label text-xs font-semibold uppercase tracking-wide text-navy-500">Publish date</label>
+              <input
+                type="date"
+                value={publishDate}
+                onChange={(e) => setPublishDate(e.target.value)}
+                required
+                className="input mt-1 w-full"
+              />
+            </div>
+            <div>
+              <label className="label text-xs font-semibold uppercase tracking-wide text-navy-500">Status</label>
+              <select value={status} onChange={(e) => setStatus(e.target.value)} required className="input mt-1 w-full capitalize">
+                {STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {statusLabel(s)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <button type="submit" disabled={submitting} className="btn-accent flex items-center justify-center gap-1.5">
+            {submitting ? "Saving..." : "Save changes"}
+          </button>
+
+          {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+        </form>
       </div>
     </div>
   );
@@ -303,7 +527,13 @@ function NewContentItemForm({ clients, onCreated }: { clients: Client[]; onCreat
     setError(null);
     setSubmitting(true);
     try {
-      await apiPost("/content-items", { clientId, title, channel, format, publishDate: new Date(publishDate).toISOString() });
+      await apiPost("/content-items", {
+        clientId,
+        title: title.trim(),
+        channel,
+        format: format.trim(),
+        publishDate: new Date(publishDate).toISOString(),
+      });
       setTitle("");
       setFormat("");
       setPublishDate("");
