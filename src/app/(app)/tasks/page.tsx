@@ -14,7 +14,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { apiGet, apiPatch, apiPost, apiDelete, ApiError } from "@/lib/api";
-import type { AssignableUser, Client, ContentItem, Deliverable, Stage } from "@/lib/types";
+import type { AssignableUser, Deliverable, Stage } from "@/lib/types";
 
 const PRIORITY_COLOR: Record<string, string> = {
   low: "bg-navy-50 text-navy-500",
@@ -40,8 +40,6 @@ export default function TasksPage() {
   const [stages, setStages] = useState<Stage[]>([]);
   const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
   const [people, setPeople] = useState<AssignableUser[]>([]);
-  const [contentItems, setContentItems] = useState<ContentItem[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
   const [assigneeFilter, setAssigneeFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [moveError, setMoveError] = useState<string | null>(null);
@@ -52,18 +50,14 @@ export default function TasksPage() {
     setLoading(true);
     try {
       const query = assigneeFilter ? `?assigneeId=${assigneeFilter}` : "";
-      const [stagesRes, deliverablesRes, peopleRes, contentItemsRes, clientsRes] = await Promise.all([
+      const [stagesRes, deliverablesRes, peopleRes] = await Promise.all([
         apiGet<{ stages: Stage[] }>("/stages"),
         apiGet<{ deliverables: Deliverable[] }>(`/deliverables${query}`),
         apiGet<{ users: AssignableUser[] }>("/users/assignable"),
-        apiGet<{ contentItems: ContentItem[] }>("/content-items"),
-        apiGet<{ clients: Client[] }>("/clients"),
       ]);
       setStages(stagesRes.stages.sort((a, b) => a.order - b.order));
       setDeliverables(deliverablesRes.deliverables);
       setPeople(peopleRes.users);
-      setContentItems(contentItemsRes.contentItems);
-      setClients(clientsRes.clients);
     } finally {
       setLoading(false);
     }
@@ -83,18 +77,6 @@ export default function TasksPage() {
     }
     return map;
   }, [deliverables]);
-
-  // Lookup used only to enrich each card with its client's name — the
-  // deliverables API returns contentItem.clientId but not the client's
-  // name, and /content-items (already fetched for the New Task form) has
-  // it. See note below if this is ever moved server-side for scale.
-  const clientNameByContentItemId = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const ci of contentItems) {
-      if (ci.client?.name) map.set(ci.id, ci.client.name);
-    }
-    return map;
-  }, [contentItems]);
 
   async function moveTo(deliverableId: string, stageId: string) {
     setMoveError(null);
@@ -180,8 +162,6 @@ export default function TasksPage() {
         <NewTaskForm
           stages={stages}
           people={people}
-          clients={clients}
-          contentItems={contentItems}
           onCreated={() => {
             setShowForm(false);
             load();
@@ -235,118 +215,103 @@ export default function TasksPage() {
 
                 <div className="max-h-[calc(100vh-320px)] min-h-[7rem] flex-1 overflow-y-auto px-3 pb-3">
                   <div className="flex flex-col gap-2.5">
-                    {cards.map((d) => {
-                      const clientName = d.contentItem
-                        ? clientNameByContentItemId.get(d.contentItem.id)
-                        : undefined;
-                      return (
-                        <div
-                          key={d.id}
-                          className="rounded-xl bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,0.08)] transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_24px_-6px_rgba(15,23,42,0.18)]"
-                        >
-                          <div className="flex items-start gap-2">
-                            <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${PRIORITY_DOT[d.priority]}`} />
-                            <div className="min-w-0 flex-1">
-                              <Link
-                                href={`/deliverables/${d.id}`}
-                                className="block truncate text-sm font-semibold leading-snug text-navy-900 hover:text-orange"
-                              >
-                                {d.title}
-                              </Link>
-                              {d.contentItem && (
-                                <p className="truncate text-xs text-navy-400">
-                                  {clientName ? (
-                                    <>
-                                      <span className="font-medium text-navy-500">{clientName}</span>
-                                      {" — "}
-                                      {d.contentItem.title}
-                                    </>
-                                  ) : (
-                                    d.contentItem.title
-                                  )}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 pl-4">
-                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${PRIORITY_COLOR[d.priority]}`}>
-                              {d.priority}
-                            </span>
-                            {d.dueDate && (
-                              <span className="flex items-center gap-1 text-[10px] text-navy-400">
-                                <CalendarDays size={10} />
-                                {new Date(d.dueDate).toLocaleDateString()}
-                              </span>
-                            )}
-                            {d.assignees.length > 0 && (
-                              <span className="flex items-center gap-1">
-                                <div className="flex -space-x-1.5">
-                                  {d.assignees.slice(0, 3).map((a) => (
-                                    <span
-                                      key={a.user.id}
-                                      title={a.user.name}
-                                      className="flex h-4 w-4 items-center justify-center rounded-full border border-white bg-navy-100 text-[8px] font-semibold text-navy-600"
-                                    >
-                                      {a.user.name[0]?.toUpperCase()}
-                                    </span>
-                                  ))}
-                                </div>
-                                <span className="max-w-[6rem] truncate text-[10px] text-navy-400">
-                                  {d.assignees.map((a) => a.user.name).join(", ")}
-                                </span>
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="mt-2.5 flex items-center justify-between gap-1 border-t border-navy-50 pt-2">
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => setEditingTask(d)}
-                                title="Edit task"
-                                className="flex h-6 w-6 items-center justify-center rounded-md text-navy-300 transition-colors hover:bg-blue-50 hover:text-blue-600"
-                              >
-                                <Pencil size={13} />
-                              </button>
-                              <button
-                                onClick={() => deleteTask(d.id)}
-                                title="Delete task"
-                                className="flex h-6 w-6 items-center justify-center rounded-md text-navy-300 transition-colors hover:bg-red-50 hover:text-red-600"
-                              >
-                                <Trash2 size={13} />
-                              </button>
-                            </div>
-
-                            {isApprovedStage(stage.label) ? (
-                              <span className="text-[10px] font-medium text-emerald-700">✓ Locked</span>
-                            ) : (
-                              (prevStage || nextStage) && (
-                                <div className="flex items-center gap-1">
-                                  {prevStage && (
-                                    <button
-                                      onClick={() => moveTo(d.id, prevStage.id)}
-                                      title={`Move to ${prevStage.label}`}
-                                      className="flex h-6 w-6 items-center justify-center rounded-md text-navy-400 transition-colors hover:bg-orange/10 hover:text-orange"
-                                    >
-                                      <ArrowLeft size={13} />
-                                    </button>
-                                  )}
-                                  {nextStage && (
-                                    <button
-                                      onClick={() => moveTo(d.id, nextStage.id)}
-                                      title={`Move to ${nextStage.label}`}
-                                      className="flex h-6 w-6 items-center justify-center rounded-md text-navy-400 transition-colors hover:bg-orange/10 hover:text-orange"
-                                    >
-                                      <ArrowRight size={13} />
-                                    </button>
-                                  )}
-                                </div>
-                              )
+                    {cards.map((d) => (
+                      <div
+                        key={d.id}
+                        className="rounded-xl bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,0.08)] transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_24px_-6px_rgba(15,23,42,0.18)]"
+                      >
+                        <div className="flex items-start gap-2">
+                          <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${PRIORITY_DOT[d.priority]}`} />
+                          <div className="min-w-0 flex-1">
+                            <Link
+                              href={`/deliverables/${d.id}`}
+                              className="block truncate text-sm font-semibold leading-snug text-navy-900 hover:text-orange"
+                            >
+                              {d.title}
+                            </Link>
+                            {d.description && (
+                              <p className="mt-0.5 line-clamp-2 text-xs text-navy-400">{d.description}</p>
                             )}
                           </div>
                         </div>
-                      );
-                    })}
+
+                        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 pl-4">
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${PRIORITY_COLOR[d.priority]}`}>
+                            {d.priority}
+                          </span>
+                          {d.dueDate && (
+                            <span className="flex items-center gap-1 text-[10px] text-navy-400">
+                              <CalendarDays size={10} />
+                              {new Date(d.dueDate).toLocaleDateString()}
+                            </span>
+                          )}
+                          {d.assignees.length > 0 && (
+                            <span className="flex items-center gap-1">
+                              <div className="flex -space-x-1.5">
+                                {d.assignees.slice(0, 3).map((a) => (
+                                  <span
+                                    key={a.user.id}
+                                    title={a.user.name}
+                                    className="flex h-4 w-4 items-center justify-center rounded-full border border-white bg-navy-100 text-[8px] font-semibold text-navy-600"
+                                  >
+                                    {a.user.name[0]?.toUpperCase()}
+                                  </span>
+                                ))}
+                              </div>
+                              <span className="max-w-[6rem] truncate text-[10px] text-navy-400">
+                                {d.assignees.map((a) => a.user.name).join(", ")}
+                              </span>
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="mt-2.5 flex items-center justify-between gap-1 border-t border-navy-50 pt-2">
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => setEditingTask(d)}
+                              title="Edit task"
+                              className="flex h-6 w-6 items-center justify-center rounded-md text-navy-300 transition-colors hover:bg-blue-50 hover:text-blue-600"
+                            >
+                              <Pencil size={13} />
+                            </button>
+                            <button
+                              onClick={() => deleteTask(d.id)}
+                              title="Delete task"
+                              className="flex h-6 w-6 items-center justify-center rounded-md text-navy-300 transition-colors hover:bg-red-50 hover:text-red-600"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+
+                          {isApprovedStage(stage.label) ? (
+                            <span className="text-[10px] font-medium text-emerald-700">✓ Locked</span>
+                          ) : (
+                            (prevStage || nextStage) && (
+                              <div className="flex items-center gap-1">
+                                {prevStage && (
+                                  <button
+                                    onClick={() => moveTo(d.id, prevStage.id)}
+                                    title={`Move to ${prevStage.label}`}
+                                    className="flex h-6 w-6 items-center justify-center rounded-md text-navy-400 transition-colors hover:bg-orange/10 hover:text-orange"
+                                  >
+                                    <ArrowLeft size={13} />
+                                  </button>
+                                )}
+                                {nextStage && (
+                                  <button
+                                    onClick={() => moveTo(d.id, nextStage.id)}
+                                    title={`Move to ${nextStage.label}`}
+                                    className="flex h-6 w-6 items-center justify-center rounded-md text-navy-400 transition-colors hover:bg-orange/10 hover:text-orange"
+                                  >
+                                    <ArrowRight size={13} />
+                                  </button>
+                                )}
+                              </div>
+                            )
+                          )}
+                        </div>
+                      </div>
+                    ))}
 
                     {cards.length === 0 && (
                       <div className="flex h-20 flex-col items-center justify-center rounded-xl border border-dashed border-navy-200 text-center">
@@ -367,20 +332,16 @@ export default function TasksPage() {
 function NewTaskForm({
   stages,
   people,
-  clients,
-  contentItems,
   onCreated,
   onClose,
 }: {
   stages: Stage[];
   people: AssignableUser[];
-  clients: Client[];
-  contentItems: ContentItem[];
   onCreated: () => void;
   onClose: () => void;
 }) {
   const [title, setTitle] = useState("");
-  const [clientId, setClientId] = useState("");
+  const [description, setDescription] = useState("");
   const [stageId, setStageId] = useState(stages[0]?.id ?? "");
   const [ownerId, setOwnerId] = useState(people[0]?.id ?? "");
   const [priority, setPriority] = useState<(typeof PRIORITIES)[number]>("medium");
@@ -389,22 +350,16 @@ function NewTaskForm({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // A client may have zero, one, or several content items. Since a task can
-  // only attach via contentItemId today, pick the client's first existing
-  // content item automatically. If they have none yet, the task is created
-  // as internal — flagged below, not hidden.
-  const matchingContentItems = contentItems.filter((ci) => ci.clientId === clientId);
-  const resolvedContentItemId = matchingContentItems[0]?.id;
-  const clientHasNoContentItem = clientId !== "" && matchingContentItems.length === 0;
-
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setSubmitting(true);
     try {
+      // No contentItemId is sent, so the task is not linked to any
+      // calendar content item and won't show its text.
       await apiPost("/deliverables", {
         title,
-        contentItemId: resolvedContentItemId,
+        description: description || undefined,
         stageId,
         ownerId,
         priority,
@@ -432,7 +387,7 @@ function NewTaskForm({
       </div>
 
       <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-6">
-        <div className="sm:col-span-3">
+        <div className="sm:col-span-6">
           <label className="label text-xs font-semibold uppercase tracking-wide text-navy-500">Title</label>
           <input
             value={title}
@@ -443,20 +398,14 @@ function NewTaskForm({
           />
         </div>
 
-        <div className="sm:col-span-3">
-          <label className="label text-xs font-semibold uppercase tracking-wide text-navy-500">Client</label>
-          <select
-            value={clientId}
-            onChange={(e) => setClientId(e.target.value)}
-            className="input mt-1 w-full"
-          >
-            <option value="">No client — internal task</option>
-            {clients.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+        <div className="sm:col-span-6">
+          <label className="label text-xs font-semibold uppercase tracking-wide text-navy-500">Description</label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={3}
+            className="input mt-1 w-full resize-none"
+          />
         </div>
 
         <div className="sm:col-span-3">
@@ -471,7 +420,7 @@ function NewTaskForm({
           </select>
         </div>
 
-        <div className="sm:col-span-2">
+        <div className="sm:col-span-3">
           <label className="label text-xs font-semibold uppercase tracking-wide text-navy-500">Stage</label>
           <select value={stageId} onChange={(e) => setStageId(e.target.value)} required className="input mt-1 w-full">
             {stages.map((s) => (
@@ -482,7 +431,7 @@ function NewTaskForm({
           </select>
         </div>
 
-        <div className="sm:col-span-2">
+        <div className="sm:col-span-3">
           <label className="label text-xs font-semibold uppercase tracking-wide text-navy-500">Priority</label>
           <select
             value={priority}
@@ -497,7 +446,7 @@ function NewTaskForm({
           </select>
         </div>
 
-        <div className="sm:col-span-2">
+        <div className="sm:col-span-3">
           <label className="label text-xs font-semibold uppercase tracking-wide text-navy-500">Due date</label>
           <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="input mt-1 w-full" />
         </div>
@@ -529,17 +478,6 @@ function NewTaskForm({
           {submitting ? "Creating..." : "Create task"}
         </button>
 
-        {!clientId && (
-          <p className="text-xs text-navy-400 sm:col-span-6">
-            No client selected — this will be an internal task, hidden from client contacts.
-          </p>
-        )}
-        {clientHasNoContentItem && (
-         <p className="text-xs text-orange-600 sm:col-span-6">
-  This client doesn&apos;t have a content item yet, so this task will still be created as internal —
-  add a content item for them from the Calendar page for it to show up under their name.
-</p>
-        )}
         {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 sm:col-span-6">{error}</p>}
       </form>
     </div>
