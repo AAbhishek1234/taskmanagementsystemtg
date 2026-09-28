@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { Plus, X, Users, Palette } from "lucide-react";
-import { apiGet, apiPost, ApiError } from "@/lib/api";
+import { Plus, X, Users, Palette, Trash2 } from "lucide-react";
+import { apiGet, apiPost, apiDelete, ApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import type { Client } from "@/lib/types";
 
@@ -11,7 +11,12 @@ export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [pageError, setPageError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
   const canCreate = user?.role === "admin" || user?.role === "manager";
+  // Matches the backend: only admins can delete (archive) clients.
+  const canDelete = user?.role === "admin";
 
   async function load() {
     setLoading(true);
@@ -26,6 +31,26 @@ export default function ClientsPage() {
   useEffect(() => {
     load();
   }, []);
+
+  async function deleteClient(id: string, name: string) {
+    if (
+      !confirm(
+        `Delete "${name}"?\n\nThe client will be hidden everywhere. Existing tasks and files are kept.`,
+      )
+    ) {
+      return;
+    }
+    setPageError(null);
+    setDeletingId(id);
+    try {
+      await apiDelete(`/clients/${id}`);
+      await load();
+    } catch (err) {
+      setPageError(err instanceof ApiError ? err.message : "Could not delete this client.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   return (
     <div className="relative w-full max-w-full space-y-5 overflow-x-clip sm:space-y-6">
@@ -85,7 +110,18 @@ export default function ClientsPage() {
       </div>
 
       {showForm && canCreate && (
-        <NewClientForm onCreated={() => { setShowForm(false); load(); }} onClose={() => setShowForm(false)} />
+        <NewClientForm
+          existingNames={clients.map((c) => c.name)}
+          onCreated={() => {
+            setShowForm(false);
+            load();
+          }}
+          onClose={() => setShowForm(false)}
+        />
+      )}
+
+      {pageError && (
+        <p className="relative rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{pageError}</p>
       )}
 
       {loading ? (
@@ -121,6 +157,19 @@ export default function ClientsPage() {
                 style={{ backgroundColor: c.brandColor ?? "#7F94BF" }}
               />
 
+              {/* Delete (admin only). Always visible on mobile, on hover for desktop. */}
+              {canDelete && (
+                <button
+                  onClick={() => deleteClient(c.id, c.name)}
+                  disabled={deletingId === c.id}
+                  title="Delete client"
+                  aria-label={`Delete ${c.name}`}
+                  className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full text-navy-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
+
               <span
                 className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-base font-bold text-white shadow-md transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6 sm:h-16 sm:w-16"
                 style={{ backgroundColor: c.brandColor ?? "#7F94BF" }}
@@ -148,18 +197,42 @@ export default function ClientsPage() {
   );
 }
 
-function NewClientForm({ onCreated, onClose }: { onCreated: () => void; onClose: () => void }) {
+function NewClientForm({
+  existingNames,
+  onCreated,
+  onClose,
+}: {
+  existingNames: string[];
+  onCreated: () => void;
+  onClose: () => void;
+}) {
   const [name, setName] = useState("");
   const [brandColor, setBrandColor] = useState("#081C4E");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const trimmed = name.trim();
+  // Instant feedback using the clients this user can see. The backend is still
+  // the real check (it sees every client in the workspace).
+  const isDuplicate =
+    trimmed.length > 0 && existingNames.some((n) => n.trim().toLowerCase() === trimmed.toLowerCase());
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+
+    if (trimmed.length < 2) {
+      setError("Client name must be at least 2 characters.");
+      return;
+    }
+    if (isDuplicate) {
+      setError("A client with this name already exists.");
+      return;
+    }
+
     setSubmitting(true);
     try {
-      await apiPost("/clients", { name, brandColor });
+      await apiPost("/clients", { name: trimmed, brandColor });
       setName("");
       onCreated();
     } catch (err) {
@@ -186,11 +259,17 @@ function NewClientForm({ onCreated, onClose }: { onCreated: () => void; onClose:
           <label className="label text-xs font-semibold uppercase tracking-wide text-navy-500">Client name</label>
           <input
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => {
+              setName(e.target.value);
+              setError(null);
+            }}
             required
             placeholder="Acme Digital"
-            className="input mt-1 w-full"
+            className={`input mt-1 w-full ${isDuplicate ? "border-red-300" : ""}`}
           />
+          {isDuplicate && (
+            <p className="mt-1 text-[11px] text-red-600">A client with this name already exists.</p>
+          )}
         </div>
         <div>
           <label className="label flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-navy-500">
@@ -207,13 +286,13 @@ function NewClientForm({ onCreated, onClose }: { onCreated: () => void; onClose:
               className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-bold text-white sm:flex"
               style={{ backgroundColor: brandColor }}
             >
-              {name.slice(0, 2).toUpperCase() || "AA"}
+              {trimmed.slice(0, 2).toUpperCase() || "AA"}
             </span>
           </div>
         </div>
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || isDuplicate}
           className="btn-accent flex items-center gap-1.5"
         >
           <Plus size={16} />
