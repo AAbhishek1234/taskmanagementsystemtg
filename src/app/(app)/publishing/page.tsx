@@ -8,7 +8,7 @@ import {
   X,
   CalendarRange,
 } from "lucide-react";
-import { apiGet } from "@/lib/api";
+import { apiGet, apiPatch, ApiError } from "@/lib/api";
 import type { PublishingStatusItem, PublishingStatusResponse } from "@/lib/types";
 
 function toDateKey(d: Date) {
@@ -41,6 +41,7 @@ export default function PublishingStatusPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCell, setSelectedCell] = useState<{ clientName: string; dateKey: string; items: PublishingStatusItem[] } | null>(null);
+  const [statusFilter, setStatusFilter] = useState<PublishingStatusItem["computed"] | null>(null);
 
   const range = useMemo(() => {
     const today = todayUtc();
@@ -84,6 +85,11 @@ export default function PublishingStatusPage() {
     }
     return totals;
   }, [data]);
+
+  // items in a cell that match the active filter (or all of them, with no filter)
+  function visibleItems(items: PublishingStatusItem[]) {
+    return statusFilter ? items.filter((i) => i.computed === statusFilter) : items;
+  }
 
   return (
     <div className="w-full max-w-full space-y-4 overflow-x-clip sm:space-y-5">
@@ -132,21 +138,35 @@ export default function PublishingStatusPage() {
         </div>
       )}
 
-      {/* Legend / stat pills */}
+      {/* Legend / stat pills — click one to filter the grid to just that status */}
       <div className="flex flex-wrap gap-2.5">
-        {(Object.keys(STATUS_META) as (keyof typeof STATUS_META)[]).map((key) => (
-          <div
-            key={key}
-            className="flex items-center gap-2 rounded-2xl bg-white px-3.5 py-2 shadow-[0_2px_10px_rgba(15,23,42,0.06)] transition-transform duration-200 hover:-translate-y-0.5"
+        {(Object.keys(STATUS_META) as (keyof typeof STATUS_META)[]).map((key) => {
+          const active = statusFilter === key;
+          return (
+            <button
+              key={key}
+              onClick={() => setStatusFilter((prev) => (prev === key ? null : key))}
+              className={`flex items-center gap-2 rounded-2xl bg-white px-3.5 py-2 shadow-[0_2px_10px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 ${
+                active ? "ring-2 ring-inset ring-navy-800" : ""
+              }`}
+            >
+              <span className={`relative flex h-2.5 w-2.5 items-center justify-center`}>
+                <span className={`absolute inline-flex h-full w-full animate-ping rounded-full ${STATUS_META[key].dot} opacity-40`} />
+                <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${STATUS_META[key].dot}`} />
+              </span>
+              <span className="text-xs font-medium text-navy-500">{STATUS_META[key].label}</span>
+              <span className="text-sm font-bold text-navy-900">{counts[key]}</span>
+            </button>
+          );
+        })}
+        {statusFilter && (
+          <button
+            onClick={() => setStatusFilter(null)}
+            className="flex items-center gap-1 rounded-2xl border border-navy-100 px-3.5 py-2 text-xs font-medium text-navy-500 transition-colors hover:bg-navy-50"
           >
-            <span className={`relative flex h-2.5 w-2.5 items-center justify-center`}>
-              <span className={`absolute inline-flex h-full w-full animate-ping rounded-full ${STATUS_META[key].dot} opacity-40`} />
-              <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${STATUS_META[key].dot}`} />
-            </span>
-            <span className="text-xs font-medium text-navy-500">{STATUS_META[key].label}</span>
-            <span className="text-sm font-bold text-navy-900">{counts[key]}</span>
-          </div>
-        ))}
+            <X size={12} /> Clear filter
+          </button>
+        )}
       </div>
 
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
@@ -205,7 +225,8 @@ export default function PublishingStatusPage() {
                       </div>
                     </td>
                     {data.dates.map((date) => {
-                      const items = data.cells[client.id]?.[date] ?? [];
+                      const allItems = data.cells[client.id]?.[date] ?? [];
+                      const items = visibleItems(allItems);
                       if (items.length === 0) {
                         return (
                           <td
@@ -246,7 +267,13 @@ export default function PublishingStatusPage() {
         </div>
       )}
 
-      {selectedCell && <CellPanel cell={selectedCell} onClose={() => setSelectedCell(null)} />}
+      {selectedCell && (
+        <CellPanel
+          cell={selectedCell}
+          onClose={() => setSelectedCell(null)}
+          onChanged={load}
+        />
+      )}
     </div>
   );
 }
@@ -254,11 +281,29 @@ export default function PublishingStatusPage() {
 function CellPanel({
   cell,
   onClose,
+  onChanged,
 }: {
   cell: { clientName: string; dateKey: string; items: PublishingStatusItem[] };
   onClose: () => void;
+  onChanged: () => void;
 }) {
   const label = new Date(cell.dateKey).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function markPublished(itemId: string) {
+    setError(null);
+    setUpdatingId(itemId);
+    try {
+      await apiPatch(`/content-items/${itemId}`, { status: "published" });
+      onChanged();
+      onClose(); // this cell's contents just changed; simplest is to close and let the grid refresh
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not update this item.");
+      setUpdatingId(null);
+    }
+  }
+
   return (
     <div
       className="fixed inset-0 z-40 flex items-end justify-center bg-navy-950/40 p-0 backdrop-blur-[2px] duration-200 animate-in fade-in sm:items-center sm:p-4"
@@ -280,6 +325,9 @@ function CellPanel({
             <X size={16} />
           </button>
         </div>
+
+        {error && <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
+
         <div className="mt-3 space-y-2">
           {cell.items.map((item) => (
             <div
@@ -296,6 +344,16 @@ function CellPanel({
                 <span className="rounded-full bg-navy-50 px-2 py-0.5 font-medium text-navy-600">{item.channel}</span>
                 <span>{item.format}</span>
               </div>
+
+              {item.computed !== "published" && (
+                <button
+                  onClick={() => markPublished(item.id)}
+                  disabled={updatingId === item.id}
+                  className="mt-2.5 w-full rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50"
+                >
+                  {updatingId === item.id ? "Marking..." : "Mark as published"}
+                </button>
+              )}
             </div>
           ))}
         </div>
