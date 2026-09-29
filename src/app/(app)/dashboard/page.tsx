@@ -77,18 +77,20 @@ export default function DashboardPage() {
       {/* Stat cards */}
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard
-          icon={<Truck size={20} />}
-          iconBg="bg-blue-100 text-blue-600"
-          label="Open deliverables"
-          value={loading ? "-" : totalOpen}
-        />
-        <StatCard
-          icon={<AlertTriangle size={20} />}
-          iconBg="bg-orange-100 text-orange-600"
-          label="Overdue"
-          value={loading ? "-" : overdue.length}
-          valueClassName="text-orange"
-        />
+  icon={<Truck size={20} />}
+  iconBg="bg-blue-100 text-blue-600"
+  label="Open deliverables"
+  value={loading ? "-" : totalOpen}
+  href="/tasks"
+/>
+<StatCard
+  icon={<AlertTriangle size={20} />}
+  iconBg="bg-orange-100 text-orange-600"
+  label="Overdue"
+  value={loading ? "-" : overdue.length}
+  valueClassName="text-orange"
+  href="/publishing"
+/>
         <StatCard
           icon={<Layers size={20} />}
           iconBg="bg-purple-100 text-purple-600"
