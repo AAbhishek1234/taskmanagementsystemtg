@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
 import {
   ClipboardList,
   ArrowLeft,
@@ -362,11 +363,12 @@ function NewTaskForm({
   onCreated: () => void;
   onClose: () => void;
 }) {
+  const { user } = useAuth();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [clientId, setClientId] = useState("");
   const [stageId, setStageId] = useState(stages[0]?.id ?? "");
-  const [ownerId, setOwnerId] = useState(people[0]?.id ?? "");
+  const ownerId = user?.id ?? ""; // owner is always the logged-in person creating the task
   const [priority, setPriority] = useState<(typeof PRIORITIES)[number]>("medium");
   const [dueDate, setDueDate] = useState("");
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
@@ -467,14 +469,14 @@ function NewTaskForm({
 
         <div className="sm:col-span-3">
           <label className="label text-xs font-semibold uppercase tracking-wide text-navy-500">Owner</label>
-          <select value={ownerId} onChange={(e) => setOwnerId(e.target.value)} required className="input mt-1 w-full">
-            {people.length === 0 && <option value="">No one available</option>}
-            {people.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          <div className="input mt-1 flex w-full items-center gap-2 bg-navy-50 text-navy-700">
+            <span className="font-medium">{user?.name ?? "Unknown"}</span>
+            {user?.role && (
+              <span className="rounded-full bg-navy-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-navy-500">
+                {user.role}
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="sm:col-span-3">

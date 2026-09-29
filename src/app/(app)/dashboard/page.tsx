@@ -86,10 +86,10 @@ export default function DashboardPage() {
 <StatCard
   icon={<AlertTriangle size={20} />}
   iconBg="bg-orange-100 text-orange-600"
-  label="Overdue"
+  label="Needs attention"
   value={loading ? "-" : overdue.length}
   valueClassName="text-orange"
-  href="/task"
+  href="/tasks"
 />
         <StatCard
           icon={<Layers size={20} />}
@@ -163,7 +163,7 @@ export default function DashboardPage() {
                 <span className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-100 text-orange-600">
                   <AlertTriangle size={18} />
                 </span>
-                <h2 className="text-sm font-semibold text-navy-900">Overdue</h2>
+                <h2 className="text-sm font-semibold text-navy-900">Needs attention</h2>
               </div>
               <Link href="/tasks" className="text-xs font-medium text-blue-600 hover:underline">
                 View all
