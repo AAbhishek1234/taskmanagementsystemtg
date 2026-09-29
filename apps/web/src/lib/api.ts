@@ -1,5 +1,6 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
-//const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://task-mgt-backend-tg.onrender.com";
+//const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://task-mgt-backend-tg.onrender.com";
+
 export class ApiError extends Error {
   status: number;
   constructor(message: string, status: number) {
