@@ -79,7 +79,7 @@ export default function DashboardPage() {
         <StatCard
   icon={<Truck size={20} />}
   iconBg="bg-blue-100 text-blue-600"
-  label="Open deliverables"
+  label="Total deliverables"
   value={loading ? "-" : totalOpen}
   href="/tasks"
 />
@@ -89,7 +89,7 @@ export default function DashboardPage() {
   label="Overdue"
   value={loading ? "-" : overdue.length}
   valueClassName="text-orange"
-  href="/publishing"
+  href="/task"
 />
         <StatCard
           icon={<Layers size={20} />}
