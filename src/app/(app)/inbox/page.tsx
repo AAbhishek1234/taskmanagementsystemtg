@@ -53,7 +53,7 @@ export default function InboxPage() {
       {loading ? (
         <p className="text-sm text-navy-300">Loading...</p>
       ) : items.length === 0 ? (
-        <p className="card p-6 text-center text-sm text-navy-300">You're all caught up.</p>
+               <p className="card p-6 text-center text-sm text-navy-300">You&apos;re all caught up.</p>
       ) : (
         <ul className="card divide-y divide-navy-50">
           {items.map((n) => (
