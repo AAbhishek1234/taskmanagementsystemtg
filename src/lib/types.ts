@@ -43,7 +43,61 @@ export interface Deliverable {
   checklistItems?: { id: string; label: string; done: boolean }[];
   clientId?: string | null;
   client?: { id: string; name: string } | null;
+  // Hierarchy
+  listId?: string | null;
+  parentId?: string | null;
+  list?: { id: string; name: string; spaceId: string; folderId: string | null } | null;
+  subtasks?: Deliverable[];
+  ancestors?: { id: string; title: string }[];
+  checklists?: ChecklistGroup[];
 }
+
+export interface ChecklistItem {
+  id: string;
+  label: string;
+  done: boolean;
+}
+
+/** `id: null` is the legacy, ungrouped checklist from before named checklists existed. */
+export interface ChecklistGroup {
+  id: string | null;
+  name: string;
+  items: ChecklistItem[];
+}
+
+/** Workspace > Space > Folder (optional) > List */
+export interface ListNode {
+  id: string;
+  name: string;
+  spaceId: string;
+  folderId: string | null;
+  taskCount: number;
+}
+
+export interface FolderNode {
+  id: string;
+  name: string;
+  spaceId: string;
+  lists: ListNode[];
+}
+
+export interface SpaceNode {
+  id: string;
+  name: string;
+  color: string | null;
+  folders: FolderNode[];
+  lists: ListNode[]; // Lists directly in the Space (no Folder)
+}
+
+export interface ListDetail {
+  id: string;
+  name: string;
+  spaceId: string;
+  folderId: string | null;
+  space: { id: string; name: string; color: string | null };
+  folder: { id: string; name: string } | null;
+}
+
 export interface Comment {
   id: string;
   body: string;

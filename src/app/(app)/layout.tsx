@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  LayoutDashboard,
+  Home,
+  Inbox,
   Calendar,
-  CheckSquare,
+  Layers,
   Send,
   Users,
   UsersRound,
@@ -18,11 +19,13 @@ import {
 import { ROLE_LABELS, useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/Logo";
 import { NotificationBell } from "@/components/NotificationBell";
+import { SidebarTree } from "@/components/SidebarTree";
 
 const NAV_ITEMS = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Home", icon: Home },
+  { href: "/inbox", label: "Inbox", icon: Inbox },
+  { href: "/tasks", label: "Everything", icon: Layers },
   { href: "/calendar", label: "Calendar", icon: Calendar },
-  { href: "/tasks", label: "Tasks", icon: CheckSquare },
   { href: "/publishing", label: "Publishing", icon: Send },
   { href: "/clients", label: "Clients", icon: Users },
   { href: "/users", label: "Team", icon: UsersRound, adminOnly: true },
@@ -64,6 +67,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     .toUpperCase();
 
   const visibleItems = NAV_ITEMS.filter((item) => !item.adminOnly || user.role === "admin");
+  // Spaces / Folders / Lists are the internal team's workspace; freelancers and clients don't get the tree.
+  const showTree = user.role === "admin" || user.role === "manager" || user.role === "team_member";
 
   return (
        <div className="flex min-h-screen w-full max-w-full overflow-x-clip bg-[#eef1fb]">
@@ -89,7 +94,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <Logo size={28} inverted />
         </Link>
 
-        <nav className="relative z-10 mt-8 flex flex-1 flex-col gap-1">
+        <nav className="relative z-10 mt-8 flex flex-col gap-1">
           {visibleItems.map((item) => {
             const active = pathname?.startsWith(item.href);
             const Icon = item.icon;
@@ -108,6 +113,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
+        <div className="relative z-10 flex-1">{showTree && <SidebarTree />}</div>
+
         <div className="relative z-10 mt-auto px-2 pt-6 text-xs text-white/60">
           <p>Build Today.</p>
           <p>Grow Tomorrow.</p>
@@ -122,7 +129,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             className="absolute inset-0 bg-navy-900/50"
             onClick={() => setMobileNavOpen(false)}
           />
-          <aside className="relative flex h-full w-64 flex-col bg-navy-900 px-4 py-6 text-white">
+          <aside className="relative flex h-full w-64 flex-col overflow-y-auto bg-navy-900 px-4 py-6 text-white">
             <div className="flex items-center justify-between px-2">
               <Link href="/dashboard" className="flex items-center gap-2">
                 <Logo size={26} inverted />
@@ -135,7 +142,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </button>
             </div>
 
-            <nav className="mt-8 flex flex-1 flex-col gap-1">
+            <nav className="mt-8 flex flex-col gap-1">
               {visibleItems.map((item) => {
                 const active = pathname?.startsWith(item.href);
                 const Icon = item.icon;
@@ -153,6 +160,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 );
               })}
             </nav>
+
+            <div className="flex-1 overflow-y-auto">{showTree && <SidebarTree />}</div>
 
             <div className="mt-auto px-2 pt-6 text-xs text-white/60">
               <p>Build Today.</p>

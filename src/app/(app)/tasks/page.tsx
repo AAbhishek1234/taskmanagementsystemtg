@@ -150,23 +150,7 @@ export default function TasksPage() {
             </div>
           )}
 
-          {stages.length > 0 && (
-            <button
-              onClick={() => setShowForm((v) => !v)}
-              className="btn-accent flex items-center gap-1.5 whitespace-nowrap"
-            >
-              {showForm ? (
-                <>
-                  <X size={16} /> <span className="hidden sm:inline">Close</span>
-                </>
-              ) : (
-                <>
-                  <Plus size={16} /> <span className="hidden sm:inline">New task</span>
-                  <span className="sm:hidden">New</span>
-                </>
-              )}
-            </button>
-          )}
+          
         </div>
       </div>
 
