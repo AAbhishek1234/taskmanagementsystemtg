@@ -170,7 +170,6 @@ export default function TasksPage() {
       {editingTask && (
         <EditTaskForm
           deliverable={editingTask}
-          clients={clients}
           onSaved={() => {
             setEditingTask(null);
             load();
@@ -537,18 +536,15 @@ function NewTaskForm({
 
 function EditTaskForm({
   deliverable,
-  clients,
   onSaved,
   onClose,
 }: {
   deliverable: Deliverable;
-  clients: Client[];
   onSaved: () => void;
   onClose: () => void;
 }) {
   const [title, setTitle] = useState(deliverable.title);
   const [description, setDescription] = useState(deliverable.description ?? "");
-  const [clientId, setClientId] = useState(deliverable.clientId ?? "");
   const [priority, setPriority] = useState<(typeof PRIORITIES)[number]>(
     deliverable.priority as (typeof PRIORITIES)[number],
   );
@@ -556,7 +552,7 @@ function EditTaskForm({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const isComplete = !!title.trim() && !!description.trim() && !!clientId && !!dueDate;
+  const isComplete = !!title.trim() && !!description.trim() && !!dueDate;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -569,10 +565,10 @@ function EditTaskForm({
 
     setSubmitting(true);
     try {
+      // clientId is intentionally not sent, so the task keeps its current client.
       await apiPatch(`/deliverables/${deliverable.id}`, {
         title: title.trim(),
         description: description.trim(),
-        clientId,
         priority,
         dueDate: new Date(dueDate).toISOString(),
       });
@@ -612,25 +608,6 @@ function EditTaskForm({
               required
               className="input mt-1 w-full"
             />
-          </div>
-
-          <div>
-            <label className="label text-xs font-semibold uppercase tracking-wide text-navy-500">Client</label>
-            <select
-              value={clientId}
-              onChange={(e) => setClientId(e.target.value)}
-              required
-              className="input mt-1 w-full"
-            >
-              <option value="" disabled>
-                Select a client
-              </option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
           </div>
 
           <div>
