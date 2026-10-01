@@ -9,3 +9,17 @@ export function formatDate(value: string) {
     })
     .replace(/\//g, "-");
 }
+
+/** Formats a timestamp as dd-mm-yyyy, hh:mm am/pm in the viewer's local time zone. */
+export function formatDateTime(value: string) {
+  return new Date(value)
+    .toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    })
+    .replace(/\//g, "-");
+}

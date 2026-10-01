@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Inbox as InboxIcon } from "lucide-react";
 import { apiGet, apiPost } from "@/lib/api";
+import { formatDateTime } from "@/lib/format";
 import type { AppNotification } from "@/lib/types";
 
 export default function InboxPage() {
@@ -53,7 +54,7 @@ export default function InboxPage() {
       {loading ? (
         <p className="text-sm text-navy-300">Loading...</p>
       ) : items.length === 0 ? (
-               <p className="card p-6 text-center text-sm text-navy-300">You&apos;re all caught up.</p>
+        <p className="card p-6 text-center text-sm text-navy-300">You&apos;re all caught up.</p>
       ) : (
         <ul className="card divide-y divide-navy-50">
           {items.map((n) => (
@@ -61,7 +62,7 @@ export default function InboxPage() {
               <button onClick={() => open(n)} className={`block w-full px-4 py-3 text-left hover:bg-navy-50/50 ${n.read ? "" : "bg-orange-50/40"}`}>
                 <p className={`text-sm ${n.read ? "text-navy-600" : "font-semibold text-navy-900"}`}>{n.title}</p>
                 {n.body && <p className="mt-0.5 text-xs text-navy-400">{n.body}</p>}
-                <p className="mt-1 text-[11px] text-navy-300">{new Date(n.createdAt).toLocaleString()}</p>
+                <p className="mt-1 text-[11px] text-navy-300">{formatDateTime(n.createdAt)}</p>
               </button>
             </li>
           ))}
