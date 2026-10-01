@@ -23,6 +23,8 @@ export default function ListPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const canCreate = user?.role === "admin" || user?.role === "manager" || user?.role === "team_member";
+  // Admins and managers must pick an assignee. A team member's own task is assigned to them automatically.
+  const needsAssignee = user?.role === "admin" || user?.role === "manager";
 
   const [list, setList] = useState<ListDetail | null>(null);
   const [stages, setStages] = useState<Stage[]>([]);
@@ -85,7 +87,15 @@ export default function ListPage() {
 
   async function addTask(e: FormEvent) {
     e.preventDefault();
-    if (!title.trim() || !firstStageId || !user) return;
+    if (!firstStageId || !user) return;
+    if (!title.trim() || !dueDate || (needsAssignee && !assigneeId)) {
+      setError(
+        needsAssignee
+          ? "Please enter a title, choose an assignee and pick a due date."
+          : "Please enter a title and pick a due date.",
+      );
+      return;
+    }
     setAdding(true);
     setError(null);
     try {
@@ -193,8 +203,15 @@ export default function ListPage() {
       {canCreate && (
         <form onSubmit={addTask} className="card flex flex-wrap items-center gap-2 p-3">
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Add a task and press Enter" className="input min-w-[200px] flex-1" />
-          <select value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} className="input w-auto">
-            <option value="">Unassigned</option>
+          <select
+            value={assigneeId}
+            onChange={(e) => setAssigneeId(e.target.value)}
+            required={needsAssignee}
+            className="input w-auto"
+          >
+            <option value="" disabled={needsAssignee}>
+              {needsAssignee ? "Select assignee" : "Assign to me"}
+            </option>
             {people.map((p) => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
@@ -204,8 +221,12 @@ export default function ListPage() {
               <option key={p} value={p}>{p}</option>
             ))}
           </select>
-          <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="input w-auto" />
-          <button type="submit" disabled={adding || !title.trim()} className="btn-accent">
+          <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} required className="input w-auto" />
+          <button
+            type="submit"
+            disabled={adding || !title.trim() || !dueDate || (needsAssignee && !assigneeId)}
+            className="btn-accent"
+          >
             <Plus size={14} /> {adding ? "Adding..." : "Add task"}
           </button>
         </form>
