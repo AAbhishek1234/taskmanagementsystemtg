@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { apiGet } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { formatDate } from "@/lib/format";
 
 interface StageSummaryRow {
   key: string;
@@ -187,7 +188,7 @@ export default function DashboardPage() {
                         {o.title}
                       </Link>
                       <p className="mt-0.5 text-xs text-navy-400">
-                        {o.stage} &middot; Due {new Date(o.dueDate).toLocaleDateString()}
+                        {o.stage} &middot; Due {formatDate(o.dueDate)}
                       </p>
                     </div>
                     <span className="flex items-center gap-1.5 text-xs text-navy-500">

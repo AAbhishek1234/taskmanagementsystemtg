@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { apiGet, apiPatch, apiPost, apiDelete, ApiError } from "@/lib/api";
 import type { AssignableUser, Client, Deliverable, Stage } from "@/lib/types";
+import { formatDate } from "@/lib/format";
 
 const PRIORITY_COLOR: Record<string, string> = {
   low: "bg-navy-50 text-navy-500",
@@ -245,7 +246,7 @@ export default function TasksPage() {
                             {d.dueDate && (
                               <span className="flex items-center gap-1 text-[10px] text-navy-400">
                                 <CalendarDays size={10} />
-                                {new Date(d.dueDate).toLocaleDateString()}
+                                {formatDate(d.dueDate)}
                               </span>
                             )}
                             {d.assignees.length > 0 && (

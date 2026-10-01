@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { ChevronDown, ChevronRight, LayoutList, Columns3, Plus, Trash2, CalendarDays } from "lucide-react";
 import { apiDelete, apiGet, apiPatch, apiPost, ApiError } from "@/lib/api";
 import { notifyHierarchyChanged } from "@/lib/hierarchy";
+import { formatDate } from "@/lib/format";
 import { useAuth } from "@/context/AuthContext";
 import type { AssignableUser, Deliverable, ListDetail, Stage } from "@/lib/types";
 
@@ -302,7 +303,7 @@ export default function ListPage() {
                           <span className={`badge capitalize ${PRIORITY_COLOR[t.priority]}`}>{t.priority}</span>
                           {t.dueDate && (
                             <span className="flex items-center gap-1 text-navy-400">
-                              <CalendarDays size={12} /> {new Date(t.dueDate).toLocaleDateString()}
+                              <CalendarDays size={12} /> {formatDate(t.dueDate)}
                             </span>
                           )}
                           {subs.length > 0 && <span className="text-navy-400">{subs.filter((s) => s.stage?.stageType === "done").length}/{subs.length} subtasks</span>}
@@ -379,7 +380,7 @@ function TaskRow({
             </span>
           ))}
         </div>
-        {task.dueDate && <span className="text-xs text-navy-400">{new Date(task.dueDate).toLocaleDateString()}</span>}
+        {task.dueDate && <span className="text-xs text-navy-400">{formatDate(task.dueDate)}</span>}
         <span className={`badge capitalize ${PRIORITY_COLOR[task.priority]}`}>{task.priority}</span>
         <select value={task.stageId} onChange={(e) => onMove(task.id, e.target.value)} className="rounded-lg border border-navy-100 bg-white px-2 py-1 text-xs text-navy-600">
           {stages.map((s) => (
