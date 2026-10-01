@@ -29,6 +29,8 @@ interface OverdueRow {
   assignees: string[];
 }
 
+const ATTENTION_LIMIT = 5;
+
 export default function DashboardPage() {
   const { user } = useAuth();
   const [stageSummary, setStageSummary] = useState<StageSummaryRow[]>([]);
@@ -53,10 +55,15 @@ export default function DashboardPage() {
 
   const totalOpen = stageSummary.reduce((sum, s) => sum + s.count, 0);
 
+  // Only show the latest 5 in the "Needs attention" card.
+  // Newest due date first. To show the most overdue first, swap `b` and `a`.
+  const latestOverdue = [...overdue]
+    .sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime())
+    .slice(0, ATTENTION_LIMIT);
+
   return (
     <div className="space-y-6">
       {/* Welcome banner */}
-           {/* Welcome banner */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#dfe6fb] to-[#eef1fb] p-6 sm:p-8">
         <div className="relative z-10 max-w-md">
           <p className="text-sm text-navy-500">Welcome back,</p>
@@ -77,20 +84,20 @@ export default function DashboardPage() {
       {/* Stat cards */}
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard
-  icon={<Truck size={20} />}
-  iconBg="bg-blue-100 text-blue-600"
-  label="Total deliverables"
-  value={loading ? "-" : totalOpen}
-  href="/tasks"
-/>
-<StatCard
-  icon={<AlertTriangle size={20} />}
-  iconBg="bg-orange-100 text-orange-600"
-  label="Needs attention"
-  value={loading ? "-" : overdue.length}
-  valueClassName="text-orange"
-  href="/tasks"
-/>
+          icon={<Truck size={20} />}
+          iconBg="bg-blue-100 text-blue-600"
+          label="Total deliverables"
+          value={loading ? "-" : totalOpen}
+          href="/tasks"
+        />
+        <StatCard
+          icon={<AlertTriangle size={20} />}
+          iconBg="bg-orange-100 text-orange-600"
+          label="Needs attention"
+          value={loading ? "-" : overdue.length}
+          valueClassName="text-orange"
+          href="/tasks"
+        />
         <StatCard
           icon={<Layers size={20} />}
           iconBg="bg-purple-100 text-purple-600"
@@ -166,14 +173,14 @@ export default function DashboardPage() {
                 <h2 className="text-sm font-semibold text-navy-900">Needs attention</h2>
               </div>
               <Link href="/tasks" className="text-xs font-medium text-blue-600 hover:underline">
-                View all
+                View all{overdue.length > ATTENTION_LIMIT ? ` (${overdue.length})` : ""}
               </Link>
             </div>
             {overdue.length === 0 ? (
               <p className="mt-4 text-sm text-navy-300">Nothing overdue. Nice.</p>
             ) : (
               <ul className="mt-4 divide-y divide-navy-50">
-                {overdue.map((o) => (
+                {latestOverdue.map((o) => (
                   <li key={o.id} className="flex items-center justify-between py-3 text-sm">
                     <div>
                       <Link href={`/deliverables/${o.id}`} className="font-semibold text-navy-800 hover:text-orange">
