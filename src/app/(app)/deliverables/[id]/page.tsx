@@ -260,7 +260,7 @@ export default function DeliverableDetailPage() {
         </div>
       </div>
 
-      {/* <AssetsPanel deliverableId={id} /> */}
+  
 <AssetsPanel
   deliverableId={id}
   assigneeIds={deliverable.assignees.map((a) => a.user.id)}
