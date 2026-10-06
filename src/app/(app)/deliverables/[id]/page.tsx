@@ -264,7 +264,6 @@ export default function DeliverableDetailPage() {
 <AssetsPanel
   deliverableId={id}
   assigneeIds={deliverable.assignees.map((a) => a.user.id)}
-  clientId={deliverable.clientId}
 />
 
       {/* Subtasks (can nest to any depth: open a subtask to add its own) */}
