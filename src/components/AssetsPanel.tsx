@@ -526,7 +526,6 @@ function formatBytes(b?: number) {
 export function AssetsPanel({
   deliverableId,
   assigneeIds,
-  clientId,
 }: {
   deliverableId: string;
   assigneeIds: string[];
@@ -550,8 +549,8 @@ export function AssetsPanel({
     (user?.role === "team_member" || user?.role === "freelancer") &&
     !!user?.id &&
     assigneeIds.includes(user.id);
-  const isOwnClient =
-    user?.role === "client" && !!clientId && (user as any).clientId === clientId;
+  // The deliverable page already blocks clients from tasks that aren't theirs
+  const isOwnClient = user?.role === "client";
 
   const canUpload = isAdminOrManager || isAssigned;
   const canDelete = isAdminOrManager;
