@@ -551,7 +551,6 @@ export function AssetsPanel({
     assigneeIds.includes(user.id);
   // The deliverable page already blocks clients from tasks that aren't theirs
   const isOwnClient = user?.role === "client";
-
   const canUpload = isAdminOrManager || isAssigned;
   const canDelete = isAdminOrManager;
   const [deletingId, setDeletingId] = useState<string | null>(null);
