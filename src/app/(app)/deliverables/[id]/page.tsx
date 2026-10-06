@@ -260,7 +260,12 @@ export default function DeliverableDetailPage() {
         </div>
       </div>
 
-      <AssetsPanel deliverableId={id} />
+      {/* <AssetsPanel deliverableId={id} /> */}
+<AssetsPanel
+  deliverableId={id}
+  assigneeIds={deliverable.assignees.map((a) => a.user.id)}
+  clientId={deliverable.clientId}
+/>
 
       {/* Subtasks (can nest to any depth: open a subtask to add its own) */}
       <section className="card p-5">
